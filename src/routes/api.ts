@@ -4,6 +4,8 @@
 
 import { validateCampaign } from "../config";
 import {
+  kvGet,
+  kvSet,
   deleteCampaign,
   eventCountsByType,
   getAllCampaigns,
@@ -61,6 +63,7 @@ async function statusResponse(env: Env): Promise<Response> {
   } catch (e) {
     console.warn(`[chatmany] could not arm the ticker: ${e instanceof Error ? e.message : e}`);
   }
+  await ensureWebhookSubscription(env);
   // Poll health belongs HERE, not only on /auth/status: this is the endpoint the dashboard calls.
   // The signal added after the 2026-08-09 stall went onto /auth/status, which nothing in the UI
   // ever requests — so the one thing built to make a frozen poller visible was itself invisible.
@@ -83,6 +86,34 @@ async function statusResponse(env: Env): Promise<Response> {
     poll_error: pollError,
     comment_poll_error: commentPollError,
   });
+}
+
+
+/**
+ * Subscribe the connected account to this app's webhooks, once.
+ *
+ * Configuring the callback URL in the Meta dashboard subscribes the APP; this subscribes the
+ * ACCOUNT, and an event is delivered only when both are in place. handleCallback already does it
+ * on connect — but an account connected BEFORE the callback URL existed never got a delivery, and
+ * nothing about that state looks wrong from the outside: the funnel still works, just at poll speed
+ * instead of instantly. Doing it here means opening the dashboard repairs it, with no reconnect.
+ *
+ * Guarded by a kv flag so this costs one Graph call ever, not one per status poll. Non-fatal: the
+ * poll is the safety net, so failing to subscribe must never break the dashboard.
+ */
+const WEBHOOK_SUB_KEY = "webhook_subscribed_at";
+
+async function ensureWebhookSubscription(env: Env): Promise<void> {
+  try {
+    if (await kvGet(env.DB, WEBHOOK_SUB_KEY)) return;
+    const rt = await buildRuntime(env);
+    if (!rt) return;
+    await rt.client.subscribeToWebhooks();
+    await kvSet(env.DB, WEBHOOK_SUB_KEY, String(now()));
+    console.log("[chatmany] account subscribed to webhooks");
+  } catch (e) {
+    console.warn(`[chatmany] webhook subscribe failed: ${e instanceof Error ? e.message : e}`);
+  }
 }
 
 async function mediaResponse(env: Env): Promise<Response> {
