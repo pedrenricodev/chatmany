@@ -46,8 +46,14 @@ import type { ConversationRow } from "../db";
 // something that says "I followed" prompts people to actually go and follow first. A neutral label
 // like "Send me the resource" delivers exactly the same reward while asking nothing of them.
 const DEFAULT_FOLLOW_GATE =
-  "Make sure you're following so you don't miss the next one 🙌 Not following yet? Follow, then tap below.";
-const DEFAULT_FOLLOW_BUTTON = "✅ I followed";
+  "Segue o perfil pra não perder o próximo 🙌 Ainda não segue? Segue e toca no botão abaixo.";
+const DEFAULT_FOLLOW_BUTTON = "✅ Já sigo";
+
+/** Label of the button on the opening DM. Instagram caps this at MAX_BUTTON_TITLE characters. */
+const DEFAULT_OPENING_BUTTON = "Quero o link";
+
+/** Text of the email ask, sent with a user_email quick-reply chip. */
+const DEFAULT_EMAIL_ASK = "Toca no teu e-mail ou responde com ele 👇";
 
 /**
  * Instagram caps a postback button's visible title at 20 characters and rejects the whole send if
@@ -187,7 +193,7 @@ export class Engine {
   private async sendOpening(campaign: Campaign, evt: NormalizedComment): Promise<boolean> {
     const button = {
       type: "postback" as const,
-      title: buttonTitle(campaign.copy.opening_button, "Continue"),
+      title: buttonTitle(campaign.copy.opening_button, DEFAULT_OPENING_BUTTON),
       payload: taggedPayload(OPENING_PAYLOAD, campaign.campaign_id),
     };
     const ok = await this.trySend(
@@ -332,7 +338,7 @@ export class Engine {
 
   /** Returns true if this message advanced the funnel. */
   private async onTap(campaign: Campaign, evt: NormalizedMessage, labelFallback: boolean): Promise<boolean> {
-    const title = labelFallback ? buttonTitle(campaign.copy.opening_button, "Continue") : undefined;
+    const title = labelFallback ? buttonTitle(campaign.copy.opening_button, DEFAULT_OPENING_BUTTON) : undefined;
     if (!confirmsTap(evt, title)) {
       // Not the press: a typed reply, a stray payload, anything else. They stay where they are and
       // we send nothing. The opening DM with its button is already in the thread; a second copy
@@ -418,7 +424,7 @@ export class Engine {
       () =>
         this.client.sendQuickReplies(
           igsid,
-          campaign.copy.email_ask ?? "Tap your email or reply with it 👇",
+          campaign.copy.email_ask ?? DEFAULT_EMAIL_ASK,
           [{ content_type: "user_email" }],
         ),
       "email_ask_resend",
@@ -468,7 +474,7 @@ export class Engine {
           () =>
             this.client.sendQuickReplies(
               igsid,
-              campaign.copy.email_ask ?? "Tap your email or reply with it 👇",
+              campaign.copy.email_ask ?? DEFAULT_EMAIL_ASK,
               [{ content_type: "user_email" }],
             ),
           "email_ask",

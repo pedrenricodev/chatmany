@@ -52,7 +52,7 @@ async function api(path, { method = "GET", body } = {}) {
   if (res.status === 401) {
     store.token = "";
     localStorage.removeItem(TOKEN_KEY);
-    renderLogin("Session token was rejected. Enter it again.");
+    renderLogin("Token recusado. Cole de novo.");
     throw new Error("unauthorized");
   }
   const ct = res.headers.get("content-type") || "";
@@ -104,18 +104,18 @@ async function boot() {
 
 /* ---------------- login / connect ---------------- */
 function renderLogin(err) {
-  document.title = "chatmany — sign in";
+  document.title = "chatmany — entrar";
   const app = $("#app");
   app.innerHTML = "";
   const card = el(`
     <div class="login-wrap"><div class="login-card">
       <div class="brand"><span class="spark">${ICON.spark}</span><span class="name">chatmany</span></div>
-      <h2>Owner sign in</h2>
-      <p>Enter the owner token you set as the <code>OWNER_TOKEN</code> secret.</p>
+      <h2>Entrar como dono</h2>
+      <p>Cole o token que está gravado no secret <code>OWNER_TOKEN</code>.</p>
       ${err ? `<div class="banner">${esc(err)}</div>` : ""}
-      <label class="field"><span class="label">Owner token</span>
-        <input type="password" id="tok" placeholder="Your OWNER_TOKEN" autocomplete="off" /></label>
-      <button class="btn primary" id="go" style="width:100%">Continue</button>
+      <label class="field"><span class="label">Token de dono</span>
+        <input type="password" id="tok" placeholder="Seu OWNER_TOKEN" autocomplete="off" /></label>
+      <button class="btn primary" id="go" style="width:100%">Entrar</button>
     </div></div>`);
   app.appendChild(card);
   const submit = async () => {
@@ -147,25 +147,25 @@ function renderApp() {
       <aside class="sidebar">
         <div class="brand"><span class="spark">${ICON.spark}</span><span class="name">chatmany</span></div>
         <nav class="nav">
-          <button class="nav-item" data-page="automations">${ICON.automations}<span>Automations</span></button>
-          <button class="nav-item" data-page="create">${ICON.create}<span>Create</span></button>
-          <button class="nav-item" data-page="dashboard">${ICON.dashboard}<span>Dashboard</span></button>
-          <button class="nav-item" data-page="contacts">${ICON.contacts}<span>Contacts</span></button>
-          <button class="nav-item" data-page="archive">${ICON.archive}<span>Archive</span></button>
+          <button class="nav-item" data-page="automations">${ICON.automations}<span>Automações</span></button>
+          <button class="nav-item" data-page="create">${ICON.create}<span>Criar</span></button>
+          <button class="nav-item" data-page="dashboard">${ICON.dashboard}<span>Painel</span></button>
+          <button class="nav-item" data-page="contacts">${ICON.contacts}<span>Contatos</span></button>
+          <button class="nav-item" data-page="archive">${ICON.archive}<span>Arquivo</span></button>
         </nav>
         <div class="sidebar-footer">
           <div class="profile">
             <img class="avatar" src="${s.profile_picture_url || ""}" alt="" onerror="this.style.visibility='hidden'"/>
             <div class="who">
-              <div class="handle">${s.connected ? "@" + esc(s.username || "account") : "Not connected"}</div>
-              <span class="tag">self-hosted</span>
+              <div class="handle">${s.connected ? "@" + esc(s.username || "account") : "Não conectado"}</div>
+              <span class="tag">na sua própria conta</span>
             </div>
           </div>
-          <a class="gh-link" href="${GH_URL}" target="_blank" rel="noopener">${ICON.github}<span>Star on GitHub</span></a>
+          <a class="gh-link" href="${GH_URL}" target="_blank" rel="noopener">${ICON.github}<span>Dar estrela no GitHub</span></a>
           <div class="legal-links">
-            <a href="/privacy" target="_blank" rel="noopener">Privacy</a>
+            <a href="/privacy" target="_blank" rel="noopener">Privacidade</a>
             <span>·</span>
-            <a href="/data-deletion" target="_blank" rel="noopener">Data deletion</a>
+            <a href="/data-deletion" target="_blank" rel="noopener">Exclusão de dados</a>
           </div>
         </div>
       </aside>
@@ -191,16 +191,16 @@ function paintNav() {
 function connectBanner() {
   const s = store.status || {};
   if (s.connected && !s.token_expired) return "";
-  const msg = s.connected && s.token_expired ? "Your Instagram token expired — reconnect to resume." : "No Instagram account connected yet.";
+  const msg = s.connected && s.token_expired ? "O acesso ao Instagram expirou. Reconecte pra voltar a rodar." : "Nenhuma conta do Instagram conectada ainda.";
   // /auth/authorize is owner-gated. A link navigation cannot send an Authorization header, so the
   // token goes in the query; the redirect it returns sets Referrer-Policy: no-referrer.
   const authorizeUrl = `/auth/authorize?token=${encodeURIComponent(store.token)}`;
-  return `<div class="banner">${msg} <a href="${authorizeUrl}">Connect Instagram</a></div>`;
+  return `<div class="banner">${msg} <a href="${authorizeUrl}">Conectar Instagram</a></div>`;
 }
 
 function route() {
   const view = $("#view");
-  view.innerHTML = `<div class="empty">Loading…</div>`;
+  view.innerHTML = `<div class="empty">Carregando…</div>`;
   if (store.page === "automations") renderAutomations();
   else if (store.page === "create") renderCreate();
   else if (store.page === "dashboard") renderDashboard();
@@ -208,16 +208,16 @@ function route() {
   else if (store.page === "archive") renderArchive();
 }
 
-/** Relative time string ("4 hours ago") from a unix-seconds timestamp. */
+/** Relative time string ("4 horas atrás") from a unix-seconds timestamp. */
 function timeAgo(ts) {
   const s = Math.max(0, Math.floor(Date.now() / 1000) - ts);
-  if (s < 60) return "just now";
+  if (s < 60) return "agora";
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m} minute${m === 1 ? "" : "s"} ago`;
+  if (m < 60) return `${m} min atrás`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} hour${h === 1 ? "" : "s"} ago`;
+  if (h < 24) return `${h} hora${h === 1 ? "" : "s"} atrás`;
   const d = Math.floor(h / 24);
-  if (d < 30) return `${d} day${d === 1 ? "" : "s"} ago`;
+  if (d < 30) return `${d} dia${d === 1 ? "" : "s"} atrás`;
   return new Date(ts * 1000).toLocaleDateString();
 }
 
@@ -239,7 +239,7 @@ async function deleteCampaigns(ids) {
   try {
     await Promise.all(ids.map((id) => api("/api/campaigns/delete", { method: "POST", body: { campaign_id: id } })));
     store.selectedAutomations.clear();
-    toast(ids.length === 1 ? "Automation deleted" : `${ids.length} automations deleted`);
+    toast(ids.length === 1 ? "Automação excluída" : `${ids.length} automations deleted`);
     renderAutomations();
   } catch (e) {
     toast(e.message, true);
@@ -258,8 +258,8 @@ async function archiveCampaigns(ids, archived) {
     store.selectedAutomations.clear();
     toast(
       archived
-        ? ids.length === 1 ? "Automation archived" : `${ids.length} automations archived`
-        : ids.length === 1 ? "Automation restored" : `${ids.length} automations restored`,
+        ? ids.length === 1 ? "Automação arquivada" : `${ids.length} automations archived`
+        : ids.length === 1 ? "Automação restaurada" : `${ids.length} automations restored`,
     );
     archived ? renderAutomations() : renderArchive();
   } catch (e) {
@@ -301,28 +301,28 @@ async function renderAutomations() {
   view.innerHTML = `
     ${connectBanner()}
     <div class="page-head">
-      <div><div class="page-title">My automations</div><div class="page-sub">Every comment-to-DM funnel in this instance.</div></div>
-      <button class="btn primary" id="newauto">+ New automation</button>
+      <div><div class="page-title">Minhas automações</div><div class="page-sub">Todos os funis de comentário para DM deste painel.</div></div>
+      <button class="btn primary" id="newauto">+ Nova automação</button>
     </div>
     <div class="automations-toolbar">
-      <div class="search-wrap">${ICON.search}<input class="search" id="autosearch" type="text" placeholder="Search all automations" value="${esc(store.automationsSearch)}"/></div>
-      <select id="autotrigger"><option>Any trigger</option><option>Comment</option></select>
-      <select id="autostate"><option value="">Any trigger states</option>
-        <option value="live" ${store.automationsState === "live" ? "selected" : ""}>Live</option>
-        <option value="stopped" ${store.automationsState === "stopped" ? "selected" : ""}>Stopped</option>
+      <div class="search-wrap">${ICON.search}<input class="search" id="autosearch" type="text" placeholder="Buscar em todas as automações" value="${esc(store.automationsSearch)}"/></div>
+      <select id="autotrigger"><option>Qualquer gatilho</option><option>Comentário</option></select>
+      <select id="autostate"><option value="">Qualquer situação</option>
+        <option value="live" ${store.automationsState === "live" ? "selected" : ""}>No ar</option>
+        <option value="stopped" ${store.automationsState === "stopped" ? "selected" : ""}>Parada</option>
       </select>
     </div>
     <div class="automations-row2">
-      <button class="folder-btn" id="newfolder">${ICON.folder} New folder</button>
-      <button class="trash-link" id="trashlink">${ICON.archive} Archive</button>
+      <button class="folder-btn" id="newfolder">${ICON.folder} Nova pasta</button>
+      <button class="trash-link" id="trashlink">${ICON.archive} Arquivar</button>
     </div>
-    <div class="automations-row3"><button class="grid-link" id="gridlink">${ICON.grid} View as grid</button></div>
+    <div class="automations-row3"><button class="grid-link" id="gridlink">${ICON.grid} Ver em grade</button></div>
     <div id="autolist"></div>`;
 
   $("#newauto").onclick = () => openInBuilder(null);
-  $("#newfolder").onclick = () => toast("Folders are coming soon");
+  $("#newfolder").onclick = () => toast("Pastas ainda estão por vir");
   $("#trashlink").onclick = () => { store.page = "archive"; paintNav(); route(); };
-  $("#gridlink").onclick = () => toast("Grid view is coming soon");
+  $("#gridlink").onclick = () => toast("Ver em grade ainda está por vir");
   $("#autotrigger").onchange = () => {}; // only one trigger type exists today (comment); reserved for future triggers
   $("#autosearch").oninput = (e) => {
     store.automationsSearch = e.target.value;
@@ -348,11 +348,11 @@ function paintAutoList() {
   });
 
   if (store.campaigns.length === 0) {
-    box.innerHTML = `<div class="empty">${ICON.automations}<div>No automations yet. Click "+ New automation" to build your first comment-to-DM funnel.</div></div>`;
+    box.innerHTML = `<div class="empty">${ICON.automations}<div>Nenhuma automação ainda. Clique em "+ Nova automação" pra montar teu primeiro funil de comentário para DM.</div></div>`;
     return;
   }
   if (rows.length === 0) {
-    box.innerHTML = `<div class="empty">No automations match your search.</div>`;
+    box.innerHTML = `<div class="empty">Nenhuma automação bate com a busca.</div>`;
     return;
   }
 
@@ -364,14 +364,14 @@ function paintAutoList() {
   box.innerHTML = "";
   if (n > 0) {
     box.appendChild(
-      el(`<div class="bulk-bar"><span>${n} selected</span><div class="spacer"></div>
-        <button class="btn ghost sm" id="bulkarchive">${ICON.archive} Archive</button>
-        <button class="btn danger sm" id="bulkdelete">${ICON.trash} Delete</button>
-        <button class="btn ghost sm" id="bulkcancel">Cancel</button></div>`),
+      el(`<div class="bulk-bar"><span>${n} selecionada(s)</span><div class="spacer"></div>
+        <button class="btn ghost sm" id="bulkarchive">${ICON.archive} Arquivar</button>
+        <button class="btn danger sm" id="bulkdelete">${ICON.trash} Excluir</button>
+        <button class="btn ghost sm" id="bulkcancel">Cancelar</button></div>`),
     );
   }
   box.appendChild(
-    el(`<div class="auto-list-head"><span></span><span>Name ▾</span><span>Runs</span><span>CTR</span><span>Modified ▾</span></div>`),
+    el(`<div class="auto-list-head"><span></span><span>Nome ▾</span><span>Disparos</span><span>CTR</span><span>Modificada ▾</span></div>`),
   );
   rows.forEach((c) => {
     const thumb = (store.media.find((m) => m.id === c.media_id) || {}).thumbnail_url || "";
@@ -383,12 +383,12 @@ function paintAutoList() {
         <input type="checkbox" ${checked ? "checked" : ""}/>
         <div class="auto-name-cell">
           <div class="auto-name-line">
-            <span class="status-pill ${c.active ? "live" : "stopped"}">${c.active ? "live" : "stopped"}</span>
+            <span class="status-pill ${c.active ? "live" : "stopped"}">${c.active ? "no ar" : "parada"}</span>
             <span class="auto-name">${esc(c.name || c.campaign_id)}</span>
           </div>
           <div class="auto-trigger">
             ${thumb ? `<img src="${esc(thumb)}" alt=""/>` : ""}
-            <span>User comments and comment contains</span>
+            <span>A pessoa comenta e o comentário tem</span>
             <span class="kw-pill">${esc(kw)}</span>
           </div>
         </div>
@@ -427,10 +427,10 @@ async function renderArchive() {
   view.innerHTML = `
     ${connectBanner()}
     <div class="page-head">
-      <div><div class="page-title">Archive</div><div class="page-sub">Stopped automations, kept out of the way but not deleted — restore any of them at any time.</div></div>
+      <div><div class="page-title">Arquivo</div><div class="page-sub">Automações paradas, fora do caminho mas não excluídas. Dá pra restaurar qualquer uma a qualquer hora.</div></div>
     </div>
     <div class="automations-toolbar">
-      <div class="search-wrap">${ICON.search}<input class="search" id="archsearch" type="text" placeholder="Search archived automations" value="${esc(store.archiveSearch)}"/></div>
+      <div class="search-wrap">${ICON.search}<input class="search" id="archsearch" type="text" placeholder="Buscar nas arquivadas" value="${esc(store.archiveSearch)}"/></div>
     </div>
     <div id="archlist"></div>`;
 
@@ -453,13 +453,13 @@ function paintArchiveList() {
     return;
   }
   if (rows.length === 0) {
-    box.innerHTML = `<div class="empty">No archived automations match your search.</div>`;
+    box.innerHTML = `<div class="empty">Nenhuma arquivada bate com a busca.</div>`;
     return;
   }
 
   box.innerHTML = "";
   box.appendChild(
-    el(`<div class="auto-list-head"><span></span><span>Name ▾</span><span></span><span></span><span>Archived ▾</span></div>`),
+    el(`<div class="auto-list-head"><span></span><span>Nome ▾</span><span></span><span></span><span>Arquivadas ▾</span></div>`),
   );
   rows.forEach((c) => {
     const kw = (c.keywords || [])[0] || "—";
@@ -468,15 +468,15 @@ function paintArchiveList() {
         <span></span>
         <div class="auto-name-cell">
           <div class="auto-name-line">
-            <span class="status-pill stopped">archived</span>
+            <span class="status-pill stopped">arquivada</span>
             <span class="auto-name">${esc(c.name || c.campaign_id)}</span>
           </div>
-          <div class="auto-trigger"><span>User comments and comment contains</span><span class="kw-pill">${esc(kw)}</span></div>
+          <div class="auto-trigger"><span>A pessoa comenta e o comentário tem</span><span class="kw-pill">${esc(kw)}</span></div>
         </div>
         <div></div>
         <div class="archive-actions">
-          <button class="btn ghost sm" data-act="restore">Restore</button>
-          <button class="btn danger sm" data-act="delete">Delete</button>
+          <button class="btn ghost sm" data-act="restore">Restaurar</button>
+          <button class="btn danger sm" data-act="delete">Excluir</button>
         </div>
         <div class="muted">${timeAgo(c.updated_at)}</div>
       </div>`);
@@ -494,10 +494,10 @@ function paintArchiveList() {
 
 /** Permanently delete an archived campaign, then refresh the archive list. */
 async function deleteFromArchive(id) {
-  if (!confirm("Permanently delete this automation? This can't be undone.")) return;
+  if (!confirm("Excluir esta automação de vez? Não dá pra desfazer.")) return;
   try {
     await api("/api/campaigns/delete", { method: "POST", body: { campaign_id: id } });
-    toast("Automation permanently deleted");
+    toast("Automação excluída de vez");
     renderArchive();
   } catch (e) {
     toast(e.message, true);
@@ -508,23 +508,23 @@ async function deleteFromArchive(id) {
 function defaultDraft() {
   return {
     campaign_id: "",
-    name: "My automation",
+    name: "Minha automação",
     media_id: "",
     media_thumb: "",
-    keywords: ["Link"],
+    keywords: ["LINK"],
     exclude: [],
-    public_reply: { enabled: false, texts: ["Sent you a DM! 📩", "Check your DMs 👀"] },
+    public_reply: { enabled: false, texts: ["Te mandei no direct! 📩", "Olha teu direct 👀"] },
     opening_enabled: true,
     check_follow: false,
     ask_email: false,
     reward: { type: "link", value: "" },
     copy: {
-      opening: "Hey! Tap below to grab the link 👇",
-      opening_button: "Send it to me",
-      follow_gate: "Make sure you're following so you don't miss the next one 🙌 Not following yet? Follow, then tap below.",
-      follow_button: "✅ I followed",
-      email_ask: "Want it in your inbox too? Tap your email or reply with it.",
-      delivery: "Here you go 🎉 {reward}",
+      opening: "Oi! Toca no botão aqui embaixo pra pegar o link 👇",
+      opening_button: "Quero o link",
+      follow_gate: "Segue o perfil pra não perder o próximo 🙌 Ainda não segue? Segue e toca no botão abaixo.",
+      follow_button: "✅ Já sigo",
+      email_ask: "Quer receber no e-mail também? Toca no teu e-mail ou responde com ele.",
+      delivery: "Toma aí 🎉 {reward}",
     },
     active: false,
   };
@@ -538,7 +538,7 @@ function draftFromCampaign(c) {
     media_thumb: (store.media.find((m) => m.id === c.media_id) || {}).thumbnail_url || "",
     keywords: c.keywords || [],
     exclude: c.exclude || [],
-    public_reply: c.public_reply || { enabled: false, texts: ["Sent you a DM! 📩"] },
+    public_reply: c.public_reply || { enabled: false, texts: ["Te mandei no direct! 📩"] },
     opening_enabled: true,
     check_follow: !!c.check_follow,
     ask_email: !!c.ask_email,
@@ -572,14 +572,14 @@ async function renderCreate() {
   const top = el(`
     <div class="builder-topbar">
       <input class="name" id="cname" value="${esc(d.name)}" />
-      <span class="status-pill ${d.active ? "live" : "stopped"}" id="statuspill">${d.active ? "live" : "stopped"}</span>
+      <span class="status-pill ${d.active ? "live" : "stopped"}" id="statuspill">${d.active ? "no ar" : "parada"}</span>
       <div class="spacer"></div>
-      <select id="loadsel" style="width:auto"><option value="">New automation…</option>${store.campaigns
+      <select id="loadsel" style="width:auto"><option value="">Nova automação…</option>${store.campaigns
         .map((c) => `<option value="${esc(c.campaign_id)}" ${c.campaign_id === d.campaign_id ? "selected" : ""}>${esc(c.name || c.campaign_id)}</option>`)
         .join("")}</select>
-      ${d.campaign_id ? `<button class="btn danger sm" id="deletebtn">${ICON.trash} Delete</button>` : ""}
-      <button class="btn ghost sm" id="savebtn" title="Changes do not take effect until saved">Save</button>
-      <button class="btn primary sm" id="golive">${d.active ? "Stop" : "Go live"}</button>
+      ${d.campaign_id ? `<button class="btn danger sm" id="deletebtn">${ICON.trash} Excluir</button>` : ""}
+      <button class="btn ghost sm" id="savebtn" title="As mudanças só valem depois de salvar">Salvar</button>
+      <button class="btn primary sm" id="golive">${d.active ? "Parar" : "Colocar no ar"}</button>
     </div>`);
   view.appendChild(top);
 
@@ -616,7 +616,7 @@ async function renderCreate() {
       if (!confirm(`Delete "${d.name || d.campaign_id}"? This can't be undone.`)) return;
       try {
         await api("/api/campaigns/delete", { method: "POST", body: { campaign_id: d.campaign_id } });
-        toast("Automation deleted");
+        toast("Automação excluída");
         store.page = "automations";
         paintNav();
         route();
@@ -648,73 +648,73 @@ function renderSections() {
               <img src="${esc(m.thumbnail_url || m.media_url || "")}" alt="" loading="lazy"/></div>`,
           )
           .join("")
-      : `<div class="muted" style="padding:8px 0">Connect Instagram to load your posts. You can still edit the copy and preview below.</div>`;
+      : `<div class="muted" style="padding:8px 0;grid-column:1/-1">Conecte o Instagram pra carregar teus posts. Dá pra escrever os textos e ver a prévia mesmo assim.</div>`;
   const seeMoreBtn = hasMore
     ? `<button class="btn ghost sm" id="mediaSeeMore" style="margin-top:10px">${
-        store.mediaShowAll ? "Show less" : `See more (${store.media.length - MEDIA_ROW_SIZE})`
+        store.mediaShowAll ? "Ver menos" : `Ver mais (${store.media.length - MEDIA_ROW_SIZE})`
       }</button>`
     : "";
 
   box.innerHTML = `
     <div class="card">
-      <h3><span class="section-num">1</span>When someone comments on</h3>
-      <div class="hint">Pick the post or reel this automation watches.</div>
-      <div class="radio-row selected"><span class="radio-dot"></span><div><div class="rr-title">A specific post or reel</div><div class="rr-sub">Only comments on the selected media trigger the funnel.</div></div></div>
-      <div class="radio-row disabled"><span class="radio-dot"></span><div><div class="rr-title">Any post or reel</div><div class="rr-sub">Soon</div></div></div>
+      <h3><span class="section-num">1</span>Quando alguém comentar em</h3>
+      <div class="hint">Escolha o post ou reel que esta automação vigia.</div>
+      <div class="radio-row selected"><span class="radio-dot"></span><div><div class="rr-title">Um post ou reel específico</div><div class="rr-sub">Só comentários no post escolhido disparam o funil.</div></div></div>
+      <div class="radio-row disabled"><span class="radio-dot"></span><div><div class="rr-title">Qualquer post ou reel</div><div class="rr-sub">Em breve</div></div></div>
       <div class="media-grid" id="mediagrid">${mediaGrid}</div>
       ${seeMoreBtn}
     </div>
 
     <div class="card">
-      <h3><span class="section-num">2</span>And this comment has</h3>
-      <div class="hint">Whole-word match, case-insensitive — “ai” fires on “I like this ai”, not “fair”.</div>
-      <div class="radio-row selected"><span class="radio-dot"></span><div><div class="rr-title">A specific word or words</div></div></div>
-      <label class="field"><span class="label">Keywords (comma separated)</span>
-        <input type="text" id="keywords" value="${esc(d.keywords.join(", "))}" placeholder="Link, Guide"/></label>
-      <div class="chips" id="kwchips">${["Price", "Link", "Shop"].map((k) => `<span class="chip" data-kw="${k}">${k}</span>`).join("")}</div>
-      <label class="field" style="margin-top:14px"><span class="label">Exclude words (optional)</span>
-        <input type="text" id="exclude" value="${esc((d.exclude || []).join(", "))}" placeholder="scam, fake"/></label>
-      <div class="radio-row disabled"><span class="radio-dot"></span><div><div class="rr-title">Any word</div><div class="rr-sub">Soon</div></div></div>
+      <h3><span class="section-num">2</span>E o comentário tiver</h3>
+      <div class="hint">Casa palavra inteira, sem ligar pra maiúscula nem acento — “link” dispara em “manda o LINK!”, mas não em “linkedin”.</div>
+      <div class="radio-row selected"><span class="radio-dot"></span><div><div class="rr-title">Uma palavra específica</div></div></div>
+      <label class="field"><span class="label">Palavras-chave (separadas por vírgula)</span>
+        <input type="text" id="keywords" value="${esc(d.keywords.join(", "))}" placeholder="LINK, QUERO"/></label>
+      <div class="chips" id="kwchips">${["LINK", "QUERO", "PREÇO"].map((k) => `<span class="chip" data-kw="${k}">${k}</span>`).join("")}</div>
+      <label class="field" style="margin-top:14px"><span class="label">Palavras que cancelam (opcional)</span>
+        <input type="text" id="exclude" value="${esc((d.exclude || []).join(", "))}" placeholder="golpe, fake"/></label>
+      <div class="radio-row disabled"><span class="radio-dot"></span><div><div class="rr-title">Qualquer palavra</div><div class="rr-sub">Em breve</div></div></div>
 
       <div style="margin-top:8px">
-        <div class="toggle-row"><div><div class="tr-title">Reply to their comment</div><div class="tr-sub">Post a public reply under the comment (rotates to look human).</div></div>
+        <div class="toggle-row"><div><div class="tr-title">Responder o comentário em público</div><div class="tr-sub">Responde em público embaixo do comentário, alternando os textos pra não parecer robô.</div></div>
           <label class="switch"><input type="checkbox" id="pr_enabled" ${d.public_reply.enabled ? "checked" : ""}/><span class="slider"></span></label></div>
         <div id="pr_texts_wrap" style="${d.public_reply.enabled ? "" : "display:none"}">
-          <label class="field"><span class="label">Public replies (one per line, rotated)</span>
+          <label class="field"><span class="label">Respostas públicas (uma por linha, alternadas)</span>
             <textarea id="pr_texts">${esc((d.public_reply.texts || []).join("\n"))}</textarea></label>
         </div>
-        <div class="toggle-row disabled"><div><div class="tr-title">Like their comment</div><div class="tr-sub">Not possible — Instagram's API has no way to like a comment.</div></div>
+        <div class="toggle-row disabled"><div><div class="tr-title">Curtir o comentário</div><div class="tr-sub">Não dá: a API do Instagram não tem como curtir comentário.</div></div>
           <label class="switch"><input type="checkbox" disabled/><span class="slider"></span></label></div>
       </div>
     </div>
 
     <div class="card">
-      <h3><span class="section-num">3</span>They will get</h3>
-      <div class="toggle-row"><div><div class="tr-title">An opening DM</div><div class="tr-sub">Sent as a private reply with a button so it survives the Requests folder. Required to start the funnel.</div></div>
+      <h3><span class="section-num">3</span>A pessoa recebe</h3>
+      <div class="toggle-row"><div><div class="tr-title">Um DM de abertura</div><div class="tr-sub">Vai como resposta privada com botão, pra sobreviver à pasta Solicitações. Sem ele o funil não começa.</div></div>
         <label class="switch"><input type="checkbox" id="opening_enabled" ${d.opening_enabled ? "checked" : ""}/><span class="slider"></span></label></div>
       <div id="opening_wrap" style="${d.opening_enabled ? "" : "display:none"}">
-        <label class="field"><span class="label">Opening message</span><textarea id="c_opening">${esc(d.copy.opening)}</textarea></label>
-        <label class="field"><span class="label">Button label</span><input type="text" id="c_opening_button" maxlength="20" value="${esc(d.copy.opening_button)}"/><span class="hint">Instagram allows 20 characters on a button.</span></label>
+        <label class="field"><span class="label">Mensagem de abertura</span><textarea id="c_opening">${esc(d.copy.opening)}</textarea></label>
+        <label class="field"><span class="label">Texto do botão</span><input type="text" id="c_opening_button" maxlength="20" value="${esc(d.copy.opening_button)}"/><span class="hint">O Instagram só aceita 20 caracteres no botão.</span></label>
       </div>
-      <div class="toggle-row"><div><div class="tr-title">Ask them to follow you first</div><div class="tr-sub">Self-attestation — the tap advances (the API can’t verify a specific follow).</div></div>
+      <div class="toggle-row"><div><div class="tr-title">Pedir pra seguir antes</div><div class="tr-sub">É só no fiado: tocar já avança, porque a API não tem como verificar se a pessoa seguiu mesmo.</div></div>
         <label class="switch"><input type="checkbox" id="check_follow" ${d.check_follow ? "checked" : ""}/><span class="slider"></span></label></div>
       <div id="follow_wrap" style="${d.check_follow ? "" : "display:none"}">
-        <label class="field"><span class="label">Follow message</span><textarea id="c_follow_gate">${esc(d.copy.follow_gate)}</textarea></label>
-        <label class="field"><span class="label">Follow button label</span><input type="text" id="c_follow_button" maxlength="20" value="${esc(d.copy.follow_button)}"/><span class="hint">Instagram allows 20 characters on a button.</span></label>
+        <label class="field"><span class="label">Mensagem da porta de seguir</span><textarea id="c_follow_gate">${esc(d.copy.follow_gate)}</textarea></label>
+        <label class="field"><span class="label">Texto do botão de seguir</span><input type="text" id="c_follow_button" maxlength="20" value="${esc(d.copy.follow_button)}"/><span class="hint">O Instagram só aceita 20 caracteres no botão.</span></label>
       </div>
-      <div class="toggle-row"><div><div class="tr-title">Ask for their email</div><div class="tr-sub">Uses Instagram’s email chip, with a typed-reply fallback.</div></div>
+      <div class="toggle-row"><div><div class="tr-title">Pedir o e-mail</div><div class="tr-sub">Usa o botão de e-mail do Instagram, e aceita a pessoa digitar também.</div></div>
         <label class="switch"><input type="checkbox" id="ask_email" ${d.ask_email ? "checked" : ""}/><span class="slider"></span></label></div>
       <div id="email_wrap" style="${d.ask_email ? "" : "display:none"}">
-        <label class="field"><span class="label">Email ask message</span><textarea id="c_email_ask">${esc(d.copy.email_ask)}</textarea></label>
+        <label class="field"><span class="label">Mensagem pedindo o e-mail</span><textarea id="c_email_ask">${esc(d.copy.email_ask)}</textarea></label>
       </div>
     </div>
 
     <div class="card">
-      <h3><span class="section-num">4</span>And then, they will get</h3>
-      <div class="hint">The reward, delivered by DM. Use <code>{reward}</code> to place your link.</div>
-      <label class="field"><span class="label">Delivery message</span><textarea id="c_delivery">${esc(d.copy.delivery)}</textarea></label>
-      <label class="field"><span class="label">Link or reward</span><input type="url" id="reward_value" value="${esc(d.reward.value)}" placeholder="https://example.com/guide"/></label>
-      <div class="toggle-row"><div><div class="tr-title">Follow-up DM if they don’t click</div><div class="tr-sub">Soon</div></div>
+      <h3><span class="section-num">4</span>E depois recebe</h3>
+      <div class="hint">A recompensa, entregue por DM. Use <code>{reward}</code> pra encaixar teu link.</div>
+      <label class="field"><span class="label">Mensagem de entrega</span><textarea id="c_delivery">${esc(d.copy.delivery)}</textarea></label>
+      <label class="field"><span class="label">Link ou recompensa</span><input type="url" id="reward_value" value="${esc(d.reward.value)}" placeholder="https://example.com/guide"/></label>
+      <div class="toggle-row"><div><div class="tr-title">DM de lembrete se não tocar</div><div class="tr-sub">Em breve</div></div>
         <label class="switch"><input type="checkbox" disabled/><span class="slider"></span></label></div>
     </div>`;
 
@@ -803,7 +803,7 @@ function renderPreview() {
   const media = store.media.find((m) => m.id === d.media_id) || store.media[0] || {};
   const thumb = d.media_thumb || media.thumbnail_url || media.media_url || "";
   const kw = d.keywords[0] || "Link";
-  const reward = d.reward.value || "your link";
+  const reward = d.reward.value || "teu link";
   const deliveryText = (d.copy.delivery || "").replace(/\{reward\}/g, reward);
   const caption = media.caption || `New drop is live 🔥 comment "${kw}" and I'll send it.`;
   const captionLong = caption.length > 70;
@@ -819,7 +819,7 @@ function renderPreview() {
       <div class="ig-actions"><span class="heart">${ICON.heartO}</span><span>${ICON.cmt}</span><span>${ICON.send}</span></div>
       <div class="ig-stats">${(media.like_count ?? 128).toLocaleString()} likes · ${(media.comments_count ?? 0) + (d.public_reply.enabled ? 1 : 0)} comments</div>
       <div class="ig-caption"><span class="u">${esc(uname)}</span>${esc(captionShown)}${
-        captionLong ? `<span class="ig-caption-toggle" id="captoggle"> ${store.captionExpanded ? "less" : "more"}</span>` : ""
+        captionLong ? `<span class="ig-caption-toggle" id="captoggle"> ${store.captionExpanded ? "menos" : "mais"}</span>` : ""
       }</div>
     </div>`;
   } else if (store.previewTab === "comments") {
@@ -827,13 +827,13 @@ function renderPreview() {
       ${thumb ? `<img class="ig-media" style="aspect-ratio:16/9;opacity:.5" src="${esc(thumb)}"/>` : ""}
       <div class="sheet">
         <div class="sheet-handle"></div>
-        <div class="sheet-head"><span>Comments</span>${ICON.send}</div>
+        <div class="sheet-head"><span>Comentários</span>${ICON.send}</div>
         <div class="sheet-body">
-          <div class="cmt"><div class="av">@</div><div class="body"><span class="u">follower</span>${esc(kw)}!<div class="meta">2m · Reply</div></div>${""
+          <div class="cmt"><div class="av">@</div><div class="body"><span class="u">seguidor</span>${esc(kw)}!<div class="meta">2min · Responder</div></div>${""
           }</div>
           ${
             d.public_reply.enabled && (d.public_reply.texts[0] || "")
-              ? `<div class="cmt reply"><div class="av">${esc((uname[0] || "y")).toUpperCase()}</div><div class="body"><span class="u">${esc(uname)}</span>${esc(d.public_reply.texts[0])}<div class="meta">now · Reply</div></div></div>`
+              ? `<div class="cmt reply"><div class="av">${esc((uname[0] || "y")).toUpperCase()}</div><div class="body"><span class="u">${esc(uname)}</span>${esc(d.public_reply.texts[0])}<div class="meta">agora · Responder</div></div></div>`
               : ""
           }
         </div>
@@ -843,15 +843,15 @@ function renderPreview() {
     </div>`;
   } else {
     // DM funnel — a two-sided conversation: business messages on the left, the follower's taps
-    // echoed back on the right at every step, so the preview reads as "this is what they'd see."
+    // echoed back on the right at every step, so the preview reads as "é isso que a pessoa veria."
     const blocks = [];
     if (d.opening_enabled) {
       blocks.push(`<div class="bubble in">${esc(d.copy.opening)}</div>`);
-      blocks.push(`<div class="dm-btn">${esc(d.copy.opening_button || "Continue")}</div>`);
-      blocks.push(`<div class="bubble out">${esc(d.copy.opening_button || "Continue")}</div>`);
-      blocks.push(`<div class="dm-note">tap moves the chat out of Requests →</div>`);
+      blocks.push(`<div class="dm-btn">${esc(d.copy.opening_button || "Quero o link")}</div>`);
+      blocks.push(`<div class="bubble out">${esc(d.copy.opening_button || "Quero o link")}</div>`);
+      blocks.push(`<div class="dm-note">o toque tira a conversa das Solicitações →</div>`);
     } else {
-      blocks.push(`<div class="dm-note">Opening DM is off — the funnel won’t start.</div>`);
+      blocks.push(`<div class="dm-note">O DM de abertura está desligado, então o funil não começa.</div>`);
     }
     if (d.check_follow) {
       // Rendered as a button, not a quick-reply chip, to match what the engine actually sends.
@@ -871,7 +871,7 @@ function renderPreview() {
   col.innerHTML = `
     <div class="phone"><div class="phone-screen">
       ${iosStatusBar()}
-      <div class="seg">${tabBtn("post", "Post")}${tabBtn("comments", "Comments")}${tabBtn("dm", "DM")}</div>
+      <div class="seg">${tabBtn("post", "Post")}${tabBtn("comments", "Comentários")}${tabBtn("dm", "DM")}</div>
       ${body}
     </div></div>`;
   col.querySelectorAll(".seg button").forEach((b) => (b.onclick = () => {
@@ -916,7 +916,7 @@ function refreshDirtyUI() {
   if (!btn) return;
   const dirty = isDirty();
   btn.className = `btn ${dirty ? "primary" : "ghost"} sm`;
-  btn.textContent = dirty ? "Save changes •" : "Save";
+  btn.textContent = dirty ? "Salvar alterações •" : "Salvar";
 }
 
 /**
@@ -962,10 +962,10 @@ function buildCampaignFromDraft() {
 }
 
 function validateDraft(d) {
-  if (!d.media_id) return "Select a post or reel in section 1.";
-  if (!d.keywords.length) return "Add at least one keyword in section 2.";
-  if (!d.reward.value) return "Add your link or reward in section 4.";
-  if (!d.opening_enabled) return "Turn on the opening DM — it’s required to start the funnel.";
+  if (!d.media_id) return "Escolha um post ou reel na seção 1.";
+  if (!d.keywords.length) return "Coloque pelo menos uma palavra-chave na seção 2.";
+  if (!d.reward.value) return "Coloque teu link ou recompensa na seção 4.";
+  if (!d.opening_enabled) return "Liga o DM de abertura: sem ele o funil não começa.";
   return null;
 }
 
@@ -985,8 +985,8 @@ async function saveCampaign(activation) {
     d.active = active;
     if (activation) {
       markSaved();
-      // Going live or stopping is the "I'm done editing" signal — land back on the automations list.
-      toast(activation === "activate" ? "Automation is live" : "Automation stopped");
+      // Going live or stopping is the "Terminei de editar" signal — land back on the automations list.
+      toast(activation === "activate" ? "Automação no ar" : "Automação parada");
       store.page = "automations";
       paintNav();
       route();
@@ -994,9 +994,9 @@ async function saveCampaign(activation) {
     }
     markSaved();
     $("#statuspill").className = `status-pill ${active ? "live" : "stopped"}`;
-    $("#statuspill").textContent = active ? "live" : "stopped";
-    $("#golive").textContent = active ? "Stop" : "Go live";
-    toast("Saved");
+    $("#statuspill").textContent = active ? "no ar" : "parada";
+    $("#golive").textContent = active ? "Parar" : "Colocar no ar";
+    toast("Salvo");
   } catch (e) {
     toast(e.message, true);
   }
@@ -1023,25 +1023,25 @@ async function renderDashboard() {
 
   view.innerHTML = `
     ${connectBanner()}
-    <div class="page-head"><div><div class="page-title">Dashboard</div><div class="page-sub">Performance from logged funnel events.</div></div>
+    <div class="page-head"><div><div class="page-title">Dashboard</div><div class="page-sub">Números vindos dos eventos registrados do funil.</div></div>
       <div class="toolbar">
-        <div class="select-inline"><span class="muted">Campaign</span>
-          <select id="dashcamp"><option value="">All campaigns</option>${store.campaigns.map((x) => `<option value="${esc(x.campaign_id)}" ${x.campaign_id === store.dashCampaign ? "selected" : ""}>${esc(x.name || x.campaign_id)}</option>`).join("")}</select></div>
-        <div class="select-inline"><span class="muted">Range</span>
-          <select id="dashdays">${[7, 30, 90].map((n) => `<option value="${n}" ${n === store.dashDays ? "selected" : ""}>Last ${n} days</option>`).join("")}</select></div>
+        <div class="select-inline"><span class="muted">Automação</span>
+          <select id="dashcamp"><option value="">Todas as automações</option>${store.campaigns.map((x) => `<option value="${esc(x.campaign_id)}" ${x.campaign_id === store.dashCampaign ? "selected" : ""}>${esc(x.name || x.campaign_id)}</option>`).join("")}</select></div>
+        <div class="select-inline"><span class="muted">Período</span>
+          <select id="dashdays">${[7, 30, 90].map((n) => `<option value="${n}" ${n === store.dashDays ? "selected" : ""}>Últimos ${n} dias</option>`).join("")}</select></div>
       </div>
     </div>
     <div class="metrics">
-      ${card(c.comments, "Comments")}
-      ${card(c.sends, "Opening DMs")}
-      ${card(c.clicks, "Clicks", c.ctr + "% of DMs")}
-      ${card(c.follows, "Follows")}
-      ${card(c.emails, "Emails")}
-      ${card(c.delivered, "Delivered")}
+      ${card(c.comments, "Comentários")}
+      ${card(c.sends, "DMs enviados")}
+      ${card(c.clicks, "Toques no botão", c.ctr + "% dos DMs")}
+      ${card(c.follows, "Seguiram")}
+      ${card(c.emails, "E-mails")}
+      ${card(c.delivered, "Link entregue")}
     </div>
     <div class="card">
-      <h3>Conversion funnel</h3>
-      <div class="hint">Percentages are relative to comments with the keyword.</div>
+      <h3>Funil de conversão</h3>
+      <div class="hint">As porcentagens são sobre quem comentou a palavra-chave.</div>
       <div id="funnel"></div>
     </div>`;
 
@@ -1087,18 +1087,18 @@ async function renderContacts() {
 
   view.innerHTML = `
     ${connectBanner()}
-    <div class="page-head"><div><div class="page-title">Contacts</div><div class="page-sub">Everyone who entered a campaign.</div></div>
+    <div class="page-head"><div><div class="page-title">Contacts</div><div class="page-sub">Todo mundo que entrou em alguma automação.</div></div>
       <div class="toolbar">
-        <div class="select-inline"><span class="muted">Campaign</span>
-          <select id="ccamp"><option value="">All campaigns</option>${store.campaigns.map((x) => `<option value="${esc(x.campaign_id)}" ${x.campaign_id === store.contactsCampaign ? "selected" : ""}>${esc(x.name || x.campaign_id)}</option>`).join("")}</select></div>
-        <button class="btn ghost sm" id="exportcsv">Export CSV</button>
+        <div class="select-inline"><span class="muted">Automação</span>
+          <select id="ccamp"><option value="">Todas as automações</option>${store.campaigns.map((x) => `<option value="${esc(x.campaign_id)}" ${x.campaign_id === store.contactsCampaign ? "selected" : ""}>${esc(x.name || x.campaign_id)}</option>`).join("")}</select></div>
+        <button class="btn ghost sm" id="exportcsv">Baixar CSV</button>
       </div>
     </div>
     <div id="contactlist"></div>`;
 
   const list = $("#contactlist");
   if (rows.length === 0) {
-    list.innerHTML = `<div class="empty">${ICON.inbox}<div>No contacts yet. Once people comment your keyword, they’ll appear here.</div></div>`;
+    list.innerHTML = `<div class="empty">${ICON.inbox}<div>Nenhum contato ainda. Assim que alguém comentar tua palavra-chave, aparece aqui.</div></div>`;
   } else {
     rows.forEach((r) => {
       const initial = (r.username || "?")[0].toUpperCase();
@@ -1134,7 +1134,7 @@ async function renderContacts() {
       a.remove();
       URL.revokeObjectURL(a.href);
     } catch (e) {
-      toast("Export failed: " + e.message, true);
+      toast("Falhou ao exportar: " + e.message, true);
     }
   };
 }

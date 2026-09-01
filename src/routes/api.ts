@@ -152,22 +152,22 @@ async function dashboard(env: Env, url: URL): Promise<Response> {
       delivered: counts.delivered,
     },
     funnel: [
-      { label: "Commented", value: comments, pct: 100 },
-      { label: "Clicked", value: counts.button_clicked, pct: pct(counts.button_clicked) },
-      { label: "Followed", value: counts.follow_confirmed, pct: pct(counts.follow_confirmed) },
-      { label: "Gave email", value: counts.email_captured, pct: pct(counts.email_captured) },
-      { label: "Delivered", value: counts.delivered, pct: pct(counts.delivered) },
+      { label: "Comentou", value: comments, pct: 100 },
+      { label: "Tocou no botão", value: counts.button_clicked, pct: pct(counts.button_clicked) },
+      { label: "Seguiu", value: counts.follow_confirmed, pct: pct(counts.follow_confirmed) },
+      { label: "Deu o e-mail", value: counts.email_captured, pct: pct(counts.email_captured) },
+      { label: "Recebeu o link", value: counts.delivered, pct: pct(counts.delivered) },
     ],
   });
 }
 
 const STATE_LABEL: Record<string, string> = {
-  NEW: "opening",
-  AWAITING_TAP: "opening sent",
-  AWAITING_FOLLOW: "awaiting follow",
-  AWAITING_EMAIL: "awaiting email",
-  DELIVER: "delivering",
-  DONE: "delivered",
+  NEW: "abrindo",
+  AWAITING_TAP: "DM enviado",
+  AWAITING_FOLLOW: "esperando seguir",
+  AWAITING_EMAIL: "esperando e-mail",
+  DELIVER: "entregando",
+  DONE: "entregue",
 };
 
 async function contacts(env: Env, url: URL): Promise<Response> {
@@ -190,7 +190,7 @@ async function contacts(env: Env, url: URL): Promise<Response> {
 async function contactsCsv(env: Env, url: URL): Promise<Response> {
   const campaignId = url.searchParams.get("campaign_id");
   const rows = await listConversations(env.DB, campaignId);
-  const header = ["username", "igsid", "campaign_id", "status", "followed", "email", "updated_at"];
+  const header = ["usuario", "igsid", "automacao", "status", "seguiu", "email", "atualizado_em"];
   const lines = [header.join(",")];
   for (const r of rows) {
     lines.push(
@@ -199,7 +199,7 @@ async function contactsCsv(env: Env, url: URL): Promise<Response> {
         csv(r.igsid),
         csv(r.campaign_id),
         csv(STATE_LABEL[r.state] ?? r.state),
-        r.followed === 1 ? "yes" : "no",
+        r.followed === 1 ? "sim" : "nao",
         csv(r.email ?? ""),
         new Date(r.updated_at * 1000).toISOString(),
       ].join(","),
@@ -208,7 +208,7 @@ async function contactsCsv(env: Env, url: URL): Promise<Response> {
   return new Response(lines.join("\n"), {
     headers: {
       "content-type": "text/csv; charset=utf-8",
-      "content-disposition": `attachment; filename="chatmany-contacts.csv"`,
+      "content-disposition": `attachment; filename="contatos.csv"`,
     },
   });
 }

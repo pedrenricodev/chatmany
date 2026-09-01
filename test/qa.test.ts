@@ -190,9 +190,9 @@ describe("buttons: hostile and empty labels", () => {
   it("missing labels fall back to defaults rather than sending blanks", async () => {
     await upsertCampaign(db, campaign({ check_follow: true, copy: { opening: "o", delivery: "d {reward}" } as never }), true);
     await engine.handleComment(comment());
-    expect(openingBtn().title).toBe("Continue");
+    expect(openingBtn().title).toBe("Quero o link");
     await engine.handleMessage(msg({ payload: openingBtn().payload, timestamp: T + 10 }));
-    expect(followBtn().title).toBe("✅ I followed");
+    expect(followBtn().title).toBe("✅ Já sigo");
   });
 
   it("an over-long label is trimmed to 20 chars so Instagram accepts the send", async () => {
@@ -208,7 +208,7 @@ describe("buttons: hostile and empty labels", () => {
   it("a whitespace-only label falls back rather than sending a blank button", async () => {
     await upsertCampaign(db, campaign({ copy: { ...campaign().copy, opening_button: "   " } }), true);
     await engine.handleComment(comment());
-    expect(openingBtn().title).toBe("Continue");
+    expect(openingBtn().title).toBe("Quero o link");
   });
 
   it("emoji-only and quoted labels survive intact", async () => {
