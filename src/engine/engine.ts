@@ -22,7 +22,6 @@ import {
   confirmsFollow,
   confirmsTap,
   emailReasksExhausted,
-  mayReplyTo,
   parsePayload,
   taggedPayload,
 } from "./transitions";
@@ -34,7 +33,6 @@ import {
   getCampaign,
   getConversation,
   getAllConversations,
-  getOpenConversations,
   isCommentProcessed,
   logEvent,
   markCommentProcessed,
@@ -377,7 +375,7 @@ export class Engine {
       // Not a valid email (no @ / not chip-provided) — re-ask instead of silently ignoring it, so
       // the person gets a nudge rather than the bot going quiet. Resource is never sent from here.
       //
-      // Gated on mayReplyTo like the other two states, which this step was missing: a button
+      // Gated on `!evt.payload` like the other two states, which this step was missing: a button
       // payload landing here — a stale button of ours, or another app's event entirely — is not
       // somebody failing to give an address, and used to draw an email re-ask off the back of it.
       // Only a reply, and only when this message has not already acted somewhere.

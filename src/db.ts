@@ -202,14 +202,14 @@ export interface ConversationRow {
   username: string | null;
   email: string | null;
   followed: number;
-  /** How many times we have re-sent the follow gate to someone who pressed the wrong button.
-   *  Capped - see engine.resendFollowGate. (Column predates this use; it was the verify_follow_count
-   *  counter, which was removed. Reusing it means no new migration.) */
+  /** VESTIGIAL. Nothing writes this any more: the follow gate is sent exactly once per person
+   *  and never re-sent (see transitions.ts). Column kept so no migration is needed; the generic
+   *  updateConversation patch still accepts it, but no engine path passes it. */
   follow_retries: number;
   /** How many times we have re-asked for their email. Capped — see engine.resendEmailAsk. */
   email_retries: number;
-  /** How many times we have re-sent the opening button to someone who replied without pressing it.
-   *  Capped — see engine.resendOpening. */
+  /** VESTIGIAL. Same story as follow_retries: the opening button is sent exactly once and never
+   *  re-sent, so no engine path writes this. Kept only to avoid a migration. */
   tap_retries: number;
   updated_at: number;
   created_at: number;
@@ -336,22 +336,6 @@ export async function logEvent(
     .prepare(`INSERT INTO events (campaign_id, igsid, type, created_at) VALUES (?, ?, ?, ?)`)
     .bind(campaignId, igsid, type, now())
     .run();
-}
-
-/** Count events of a type for a campaign since a unix-second cutoff (rate-cap + dashboard). */
-export async function countEvents(
-  db: D1Database,
-  campaignId: string,
-  type: EventType,
-  sinceTs: number,
-): Promise<number> {
-  const row = await db
-    .prepare(
-      `SELECT COUNT(*) AS n FROM events WHERE campaign_id = ? AND type = ? AND created_at >= ?`,
-    )
-    .bind(campaignId, type, sinceTs)
-    .first<{ n: number }>();
-  return row?.n ?? 0;
 }
 
 /** Account-wide count of an event type since a cutoff (used for the global send rate cap). */
