@@ -24,3 +24,6 @@ wrangler.prod.toml*
 # qa/ imports from a sibling git worktree by absolute path, so it is machine-specific.
 qa/
 wrangler.qa.toml
+
+# segredos locais, nunca commitar
+SEGREDOS.txt
