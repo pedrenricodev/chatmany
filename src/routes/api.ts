@@ -15,6 +15,7 @@ import {
   upsertCampaign,
 } from "../db";
 import { buildRuntime } from "../runtime";
+import { tickerStub } from "../ticker";
 import { getPollAgeSeconds, getPollError } from "../poller/messagePoll";
 import { getCommentPollError } from "../poller/commentPoll";
 import type { Env } from "../types";
@@ -48,6 +49,18 @@ export async function handleApi(env: Env, req: Request, url: URL): Promise<Respo
 async function statusResponse(env: Env): Promise<Response> {
   const auth = await getAuth(env.DB);
   if (!auth) return json({ connected: false });
+
+  // Opening the dashboard arms the polling clock. The ticker re-arms itself forever after, so this
+  // only ever matters once — but "once" is easy to miss, and missing it means the funnel silently
+  // never runs. Doing it here makes the recovery for a stopped clock "open the dashboard", which
+  // needs no command and no token pasted anywhere. Arming is idempotent (a pending alarm is left
+  // alone) and non-fatal: a failure here must not take down the status endpoint the dashboard
+  // depends on.
+  try {
+    await tickerStub(env).fetch("https://ticker/arm");
+  } catch (e) {
+    console.warn(`[chatmany] could not arm the ticker: ${e instanceof Error ? e.message : e}`);
+  }
   // Poll health belongs HERE, not only on /auth/status: this is the endpoint the dashboard calls.
   // The signal added after the 2026-08-09 stall went onto /auth/status, which nothing in the UI
   // ever requests — so the one thing built to make a frozen poller visible was itself invisible.

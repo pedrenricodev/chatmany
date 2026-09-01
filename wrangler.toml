@@ -29,6 +29,18 @@ database_name = "chatmany"
 database_id = "979856e2-a18e-4fe8-a6dd-339f9e591f11"
 migrations_dir = "schema"
 
+# Polling clock. Cloudflare accepts the cron triggers above and then never invokes scheduled()
+# (confirmed 2026-09-01, see src/ticker.ts). This Durable Object is a different subsystem and does
+# the scheduling instead. new_sqlite_classes, not new_classes: the Workers Free plan can only
+# create SQLite-backed Durable Objects.
+[[durable_objects.bindings]]
+name = "TICKER"
+class_name = "Ticker"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Ticker"]
+
 # Web UI (Section 7A). Static files in ./public are served automatically; the Worker handles
 # /api/*, /auth/*, and /webhook, and falls back to index.html for client-side routes (SPA).
 [assets]

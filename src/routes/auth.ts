@@ -6,6 +6,7 @@ import { InstagramClient, WEBHOOK_FIELDS } from "../api/client";
 import { clearAuth, getAuth, kvGet, kvSet, now, saveAuth } from "../db";
 import { getPollAgeSeconds, getPollError } from "../poller/messagePoll";
 import { getCommentPollError } from "../poller/commentPoll";
+import { tickerStub } from "../ticker";
 import type { Env } from "../types";
 import { json, redirect, html } from "./http";
 
@@ -109,6 +110,14 @@ export async function handleCallback(env: Env, url: URL): Promise<Response> {
           `<p>⚠️ Conectou, mas não deu pra inscrever a conta nos webhooks:</p><pre>${detail}</pre>` +
           `<p>A checagem periódica funciona do mesmo jeito. Pra ter entrega instantânea, tenta de novo em <code>POST /admin/webhook</code> com o teu token de dono.</p>`;
       }
+    }
+
+    // Arm the polling clock now that there is an account to poll for. Non-fatal: /admin/ticker
+    // can arm it later, and the alarm re-arms itself from then on.
+    try {
+      await tickerStub(env).fetch("https://ticker/arm");
+    } catch (e) {
+      console.warn(`[chatmany] could not arm the ticker: ${e instanceof Error ? e.message : e}`);
     }
 
     return html(

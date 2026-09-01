@@ -3,11 +3,11 @@
 // added later and served from this same Worker.
 
 import type { Env } from "./types";
-import { buildRuntime, pollIntervalSeconds } from "./runtime";
-import { pollComments } from "./poller/commentPoll";
-import { pollMessages } from "./poller/messagePoll";
+import { pollIntervalSeconds } from "./runtime";
+import { runPoll } from "./poll";
+export { Ticker } from "./ticker";
+import { tickerStub } from "./ticker";
 import { refreshTokenIfDue } from "./auth/refresh";
-import { claimPollSlot } from "./db";
 import { handleAuthorize, handleCallback, handleDisconnect, handleStatus } from "./routes/auth";
 import { handleConfigExport, handleConfigImport } from "./routes/config";
 import { handleWebhookAdmin, handleWebhookEvent, handleWebhookVerify } from "./routes/webhook";
@@ -48,6 +48,7 @@ export default {
       "/config/export",
       "/admin/poll",
       "/admin/webhook",
+      "/admin/ticker",
     ]);
     if (ownerRoutes.has(pathname)) {
       if (!isOwner(req, url, env)) return json({ error: "unauthorized" }, 401);
@@ -64,6 +65,10 @@ export default {
       // Webhook subscription status / retry (see handleWebhookAdmin).
       if (pathname === "/admin/webhook" && (method === "GET" || method === "POST")) {
         return handleWebhookAdmin(env, method);
+      }
+      // Arm the polling clock, or report when the next tick is due. Arming is idempotent.
+      if (pathname === "/admin/ticker" && (method === "GET" || method === "POST")) {
+        return tickerStub(env).fetch("https://ticker/arm");
       }
       return json({ error: "method not allowed" }, 405);
     }
@@ -94,30 +99,3 @@ export default {
     }
   },
 } satisfies ExportedHandler<Env>;
-
-/**
- * Run comment + message polls, honoring the caller's poll interval (>= cron granularity).
- * claimPollSlot is an atomic claim, not a plain check-then-act read/write — see its doc comment
- * in db.ts for why that distinction matters: it's what stops an overlapping cron tick or a
- * /admin/poll call racing the cron from both polling at once and double-sending a real DM.
- */
-async function runPoll(env: Env, interval: number): Promise<void> {
-  const claimed = await claimPollSlot(env.DB, interval);
-  if (!claimed) return; // not due yet, or another invocation already claimed this slot
-
-  const rt = await buildRuntime(env);
-  if (!rt) return;
-
-  // Isolated so one poll can never starve the other. pollComments used to run first with no
-  // guard, which meant a throw there silently skipped the message poll for that whole tick.
-  try {
-    await pollComments(rt, env.DB);
-  } catch (e) {
-    console.warn(`[chatmany] pollComments failed: ${e instanceof Error ? e.message : e}`);
-  }
-  try {
-    await pollMessages(rt, env.DB);
-  } catch (e) {
-    console.warn(`[chatmany] pollMessages failed: ${e instanceof Error ? e.message : e}`);
-  }
-}

@@ -5,6 +5,8 @@ export interface Env {
   DB: D1Database;
   /** Static-asset binding serving the web UI from ./public. */
   ASSETS: Fetcher;
+  /** Self-rescheduling clock that replaces the (broken) Cron Trigger. See ticker.ts. */
+  TICKER: DurableObjectNamespace;
 
   // vars (wrangler.toml [vars])
   GRAPH_VERSION: string;
