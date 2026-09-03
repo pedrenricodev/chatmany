@@ -194,6 +194,10 @@ async function dashboard(env: Env, url: URL): Promise<Response> {
       follows: counts.follow_confirmed,
       emails: counts.email_captured,
       delivered: counts.delivered,
+      // Leads Instagram refused to let us answer (a comment past the 7-day private-reply window,
+      // a second private reply to one comment). Surfaced because the alternative is what happened
+      // on 2026-09-03: the funnel read healthy while people who commented got nothing.
+      failed: counts.opening_failed,
     },
     funnel: [
       { label: "Comentou", value: comments, pct: 100 },

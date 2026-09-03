@@ -40,7 +40,10 @@ export type EventType =
   | "button_clicked"
   | "follow_confirmed"
   | "email_captured"
-  | "delivered";
+  | "delivered"
+  /** Instagram refused the opening DM for good (e.g. the comment is past the private-reply
+   *  window). Recorded so a lead that can never be answered is visible instead of silent. */
+  | "opening_failed";
 
 export interface RewardConfig {
   type: "link" | "code" | "text";
@@ -67,6 +70,13 @@ export interface Campaign {
   /** Human-friendly automation name shown in the builder/list (optional). */
   name?: string;
   media_id: string;
+  /**
+   * Extra media this campaign also watches. Boosting a post makes Instagram serve a COPY of the
+   * media, with its own id and its own comment thread: a comment left on the ad does NOT appear
+   * on the organic post's comments edge, so a campaign that only knows the organic id never sees
+   * the people the ad brought in. Paste the boosted copy's id here and both threads are polled.
+   */
+  ad_media_ids?: string[];
   keywords: string[];
   exclude?: string[];
   public_reply?: PublicReplyConfig;

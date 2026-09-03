@@ -2,6 +2,7 @@
 // converts them to normalized events, and feeds the engine. A conservative account-wide hourly
 // cap on opening DMs guards the shared rate budget across cron ticks (Section 10).
 
+import { campaignMediaIds } from "../config";
 import { getActiveCampaigns, countEventsGlobal, kvGet, kvSet, now } from "../db";
 import type { Runtime } from "../runtime";
 import { toUnixSeconds } from "../runtime";
@@ -24,8 +25,11 @@ export async function pollComments(rt: Runtime, db: D1Database): Promise<void> {
     return;
   }
 
-  // Dedupe media so shared media across campaigns is fetched once.
-  const mediaIds = [...new Set(campaigns.map((c) => c.media_id))];
+  // Every media any campaign watches: the organic post plus any boosted copy of it. Polling only
+  // `media_id` was invisible to everyone the ad reached — Instagram serves a boosted post from a
+  // separate media whose comments never appear on the organic thread. Deduped so media shared
+  // across campaigns is fetched once.
+  const mediaIds = [...new Set(campaigns.flatMap((c) => campaignMediaIds(c)))];
   let handled = 0;
   let failed = 0;
   let lastError = "";

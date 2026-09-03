@@ -364,6 +364,7 @@ export async function eventCountsByType(
     follow_confirmed: 0,
     email_captured: 0,
     delivered: 0,
+    opening_failed: 0,
   };
   const rows = campaignId
     ? await db

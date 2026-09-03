@@ -511,6 +511,7 @@ function defaultDraft() {
     name: "Minha automação",
     media_id: "",
     media_thumb: "",
+    ad_media_ids: [],
     keywords: ["LINK"],
     exclude: [],
     public_reply: { enabled: false, texts: ["Te mandei no direct! 📩", "Olha teu direct 👀"] },
@@ -536,6 +537,7 @@ function draftFromCampaign(c) {
     name: c.name || c.campaign_id,
     media_id: c.media_id,
     media_thumb: (store.media.find((m) => m.id === c.media_id) || {}).thumbnail_url || "",
+    ad_media_ids: c.ad_media_ids || [],
     keywords: c.keywords || [],
     exclude: c.exclude || [],
     public_reply: c.public_reply || { enabled: false, texts: ["Te mandei no direct! 📩"] },
@@ -663,6 +665,9 @@ function renderSections() {
       <div class="radio-row disabled"><span class="radio-dot"></span><div><div class="rr-title">Qualquer post ou reel</div><div class="rr-sub">Em breve</div></div></div>
       <div class="media-grid" id="mediagrid">${mediaGrid}</div>
       ${seeMoreBtn}
+      <label class="field" style="margin-top:16px"><span class="label">Mídia do anúncio (opcional, uma por linha)</span>
+        <textarea id="ad_media_ids" placeholder="18093245021110195">${esc((d.ad_media_ids || []).join("\n"))}</textarea>
+        <span class="hint">Impulsionou esse post? O Instagram serve o anúncio a partir de uma <b>cópia</b> do post, com id próprio, e o comentário de quem veio pelo anúncio fica só nela — não aparece no post original. Cole aqui o id da cópia e a automação vigia os dois. Cada novo impulsionamento gera um id novo.</span></label>
     </div>
 
     <div class="card">
@@ -755,6 +760,7 @@ function wireSections() {
     const node = $("#" + id);
     if (node) node.oninput = (e) => fn(e.target.value);
   };
+  bindText("ad_media_ids", (v) => (d.ad_media_ids = v.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean)));
   bindText("keywords", (v) => (d.keywords = v.split(",").map((x) => x.trim()).filter(Boolean)));
   bindText("exclude", (v) => (d.exclude = v.split(",").map((x) => x.trim()).filter(Boolean)));
   bindText("pr_texts", (v) => (d.public_reply.texts = v.split("\n").map((x) => x.trim()).filter(Boolean)));
@@ -951,6 +957,7 @@ function buildCampaignFromDraft() {
     campaign_id: d.campaign_id || `${slug(d.name)}-${Math.random().toString(36).slice(2, 8)}`,
     name: d.name,
     media_id: d.media_id,
+    ad_media_ids: d.ad_media_ids || [],
     keywords: d.keywords,
     exclude: d.exclude,
     public_reply: d.public_reply.enabled ? { enabled: true, texts: d.public_reply.texts } : { enabled: false, texts: d.public_reply.texts },
@@ -1038,6 +1045,7 @@ async function renderDashboard() {
       ${card(c.follows, "Seguiram")}
       ${card(c.emails, "E-mails")}
       ${card(c.delivered, "Link entregue")}
+      ${c.failed ? card(c.failed, "Não deu pra responder", "Instagram recusou") : ""}
     </div>
     <div class="card">
       <h3>Funil de conversão</h3>

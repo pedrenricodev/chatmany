@@ -30,6 +30,15 @@ export function validateCampaign(input: unknown, index = 0): Campaign {
   if (c.exclude !== undefined && (!Array.isArray(c.exclude) || !c.exclude.every(isNonEmptyString))) {
     throw new ConfigError(`${where}.exclude must be an array of strings`);
   }
+  // Strings are required, but blank ones are not an error: this field is pasted in by hand, one id
+  // per line, and a stray empty line must not take the whole campaign off the air. Blanks are
+  // dropped in normalizeAdMediaIds; only a wrong TYPE is refused.
+  if (
+    c.ad_media_ids !== undefined &&
+    (!Array.isArray(c.ad_media_ids) || !c.ad_media_ids.every((v) => typeof v === "string"))
+  ) {
+    throw new ConfigError(`${where}.ad_media_ids must be an array of strings`);
+  }
 
   const reward = c.reward as Record<string, unknown> | undefined;
   if (
@@ -60,6 +69,7 @@ export function validateCampaign(input: unknown, index = 0): Campaign {
     campaign_id: c.campaign_id,
     name: typeof c.name === "string" ? c.name : undefined,
     media_id: c.media_id,
+    ad_media_ids: normalizeAdMediaIds(c.ad_media_ids as string[] | undefined, c.media_id),
     keywords: c.keywords as string[],
     exclude: (c.exclude as string[] | undefined) ?? [],
     public_reply: c.public_reply as Campaign["public_reply"],
@@ -83,6 +93,36 @@ export function validateCampaign(input: unknown, index = 0): Campaign {
       delivery: copy.delivery,
     },
   };
+}
+
+/**
+ * Trim, drop blanks, drop duplicates, and drop the organic id if it was pasted in as well.
+ * The poller unions these with `media_id`, so a duplicate would only mean fetching one thread
+ * twice per tick.
+ */
+function normalizeAdMediaIds(input: string[] | undefined, mediaId: string): string[] {
+  if (!input) return [];
+  const seen = new Set<string>([mediaId.trim()]);
+  const out: string[] = [];
+  for (const raw of input) {
+    const id = raw.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+/**
+ * Every media this campaign watches: the organic post plus any boosted copies.
+ *
+ * Boosting is why this is a list. Instagram serves an ad from a COPY of the post, and a comment
+ * left on that copy lives only on the copy's comments edge — the organic post's edge never shows
+ * it. Measured on 2026-09-03: two commenters were invisible to the poller for exactly this reason
+ * while the organic thread looked idle and healthy.
+ */
+export function campaignMediaIds(campaign: Campaign): string[] {
+  return campaign.ad_media_ids?.length ? [campaign.media_id, ...campaign.ad_media_ids] : [campaign.media_id];
 }
 
 /** Keep a copy field only if it is a non-empty string; anything else falls back to the default. */

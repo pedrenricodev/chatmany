@@ -13,6 +13,7 @@ import type {
   State,
 } from "../types";
 import { InstagramApiError } from "../api/client";
+import { campaignMediaIds } from "../config";
 import { commentTriggers, extractEmail } from "./match";
 import {
   FOLLOW_PAYLOAD,
@@ -35,6 +36,7 @@ import {
   getAllConversations,
   isCommentProcessed,
   logEvent,
+  now,
   markCommentProcessed,
   releaseSend,
   updateConversation,
@@ -128,6 +130,27 @@ function pickRotating(texts: string[], seed: string): string {
   return texts[h % texts.length]!;
 }
 
+/**
+ * Instagram only accepts a private reply to a comment for 7 days after it was left. Past that the
+ * API refuses every attempt with a plain 4xx, so a campaign attached to a post with old comments
+ * used to re-attempt the same dead comment on every tick, forever.
+ */
+const PRIVATE_REPLY_WINDOW_DAYS = 7;
+const PRIVATE_REPLY_WINDOW_SECONDS = PRIVATE_REPLY_WINDOW_DAYS * 24 * 60 * 60;
+
+/** True when a comment is old enough that Instagram will refuse to open a DM from it. */
+export function isPastPrivateReplyWindow(timestamp: number, at: number = now()): boolean {
+  return timestamp > 0 && at - timestamp > PRIVATE_REPLY_WINDOW_SECONDS;
+}
+
+/**
+ * What became of one send attempt.
+ *  - "sent"     the message went out, or was already claimed by an attempt that may have delivered
+ *  - "retry"    the attempt failed in a way that could succeed later; leave the trigger unconsumed
+ *  - "rejected" Instagram refused for good; retrying is pointless and hides the lead
+ */
+export type SendOutcome = "sent" | "retry" | "rejected";
+
 export class Engine {
   constructor(
     private readonly db: D1Database,
@@ -147,14 +170,26 @@ export class Engine {
     if (!evt.igsid) return; // cannot correlate future messages without the commenter's IGSID
 
     const all = activeCampaigns ?? (await getActiveCampaigns(this.db));
-    const campaigns = all.filter((c) => c.media_id === evt.media_id);
+    // A campaign watches its organic post AND any boosted copy of it. Matching on `media_id` alone
+    // meant every person the ad brought in was invisible: their comment lives on the copy.
+    const campaigns = all.filter((c) => campaignMediaIds(c).includes(evt.media_id));
     let matchedCampaignId = "-";
     // A retryable opening-send failure leaves the comment unprocessed so the next poll retries it.
     let pendingRetry = false;
+    // Past the 7-day window Instagram refuses to open a DM from this comment, whatever we do.
+    const unanswerable = isPastPrivateReplyWindow(evt.timestamp);
 
     for (const campaign of campaigns) {
       if (!commentTriggers(evt.text, campaign.keywords, campaign.exclude)) continue;
       matchedCampaignId = campaign.campaign_id;
+
+      // Nothing can reach this person any more, so nothing is attempted — not even the public
+      // reply, which would announce a DM that cannot be sent. Recorded rather than dropped: a
+      // trigger we could not answer is exactly the thing that must not disappear quietly.
+      if (unanswerable) {
+        await logEvent(this.db, campaign.campaign_id, "opening_failed", evt.igsid);
+        continue;
+      }
 
       // Public actions are per-comment (independent toggles), guarded so re-polls don't repeat them.
       await this.runPublicActions(campaign, evt);
@@ -165,8 +200,11 @@ export class Engine {
 
       // New lead: comment_matched + opening_sent are logged only when the opening actually sends,
       // so a failed send neither inflates the funnel nor is double-counted on the retry.
-      const sent = await this.sendOpening(campaign, evt);
-      if (!sent) pendingRetry = true;
+      const outcome = await this.sendOpening(campaign, evt);
+      if (outcome === "retry") pendingRetry = true;
+      // A refusal that will never turn into a send: consume the comment (so it stops being
+      // re-attempted every tick) and leave a mark the dashboard can show.
+      if (outcome === "rejected") await logEvent(this.db, campaign.campaign_id, "opening_failed", evt.igsid);
     }
 
     // Mark processed once nothing is awaiting retry, so we don't re-scan this comment every poll.
@@ -187,16 +225,17 @@ export class Engine {
 
   /**
    * Open the chat via a private reply to the comment, using a postback button (Step 1).
-   * Returns true if the opening was sent and the funnel entry recorded; false on a send failure
-   * (so the caller leaves the comment unprocessed for a retry on the next poll).
+   * "sent" means the opening went out and the funnel entry was recorded. "retry" leaves the
+   * comment unprocessed so the next poll tries again. "rejected" is Instagram's final answer —
+   * the caller consumes the comment and records the miss instead of looping on it forever.
    */
-  private async sendOpening(campaign: Campaign, evt: NormalizedComment): Promise<boolean> {
+  private async sendOpening(campaign: Campaign, evt: NormalizedComment): Promise<SendOutcome> {
     const button = {
       type: "postback" as const,
       title: buttonTitle(campaign.copy.opening_button, DEFAULT_OPENING_BUTTON),
       payload: taggedPayload(OPENING_PAYLOAD, campaign.campaign_id),
     };
-    const ok = await this.trySend(
+    const outcome = await this.trySend(
       () => this.client.privateReplyWithButtons(evt.comment_id, campaign.copy.opening, [button]),
       "opening",
       // Keyed on the PERSON, not the comment. Somebody who comments twice has two comment ids, so a
@@ -204,8 +243,9 @@ export class Engine {
       // DMs — the one duplicate the conversation check cannot catch, because neither had written
       // the row yet when the other looked. Per person, there is one key and one opening, ever.
       `opening:${campaign.campaign_id}:${evt.igsid}`,
+      { comment_id: evt.comment_id, campaign_id: campaign.campaign_id },
     );
-    if (!ok) return false;
+    if (outcome !== "sent") return outcome;
     // Only the call that actually inserts the funnel row owns these events. The other side of a
     // race reaches here too — its send was skipped as already-claimed, which trySend reports as
     // success — and used to log a second comment_matched and opening_sent for a DM that went out
@@ -217,7 +257,7 @@ export class Engine {
       await logEvent(this.db, campaign.campaign_id, "comment_matched", evt.igsid);
       await logEvent(this.db, campaign.campaign_id, "opening_sent", evt.igsid);
     }
-    return true;
+    return "sent";
   }
 
 
@@ -420,7 +460,7 @@ export class Engine {
       console.warn(`[chatmany] email re-ask cap reached for ${igsid} on ${campaign.campaign_id}; staying quiet.`);
       return false;
     }
-    const ok = await this.trySend(
+    const ok = "sent" === (await this.trySend(
       () =>
         this.client.sendQuickReplies(
           igsid,
@@ -431,7 +471,7 @@ export class Engine {
       // Same reasoning as the follow-gate re-send: claimed on the counter's current value, so
       // concurrent replies contend for one key instead of each sending their own nudge.
       `email_ask_resend:${campaign.campaign_id}:${igsid}:${reasks}`,
-    );
+    ));
     // Only mark the invalid-reply message as handled once the re-ask actually sent — same
     // fail-clean pattern as every other send: a failed resend leaves updated_at untouched so the
     // same message retries cleanly on the next poll instead of being silently dropped.
@@ -470,7 +510,7 @@ export class Engine {
         break;
       }
       case "AWAITING_EMAIL": {
-        const ok = await this.trySend(
+        const ok = "sent" === (await this.trySend(
           () =>
             this.client.sendQuickReplies(
               igsid,
@@ -479,18 +519,18 @@ export class Engine {
             ),
           "email_ask",
           `email_ask:${campaign.campaign_id}:${igsid}`,
-        );
+        ));
         if (!ok) return;
         await commit("AWAITING_EMAIL");
         break;
       }
       case "DELIVER": {
         const text = campaign.copy.delivery.replaceAll("{reward}", campaign.reward.value);
-        const ok = await this.trySend(
+        const ok = "sent" === (await this.trySend(
           () => this.client.sendText(igsid, text),
           "delivery",
           `delivery:${campaign.campaign_id}:${igsid}`,
-        );
+        ));
         if (!ok) return;
         await commit("DONE", "delivered");
         break;
@@ -512,11 +552,13 @@ export class Engine {
       title: buttonTitle(campaign.copy.follow_button, DEFAULT_FOLLOW_BUTTON),
       payload: taggedPayload(FOLLOW_PAYLOAD, campaign.campaign_id),
     };
-    return this.trySend(
-      () =>
-        this.client.sendButtonTemplate({ igsid }, campaign.copy.follow_gate ?? DEFAULT_FOLLOW_GATE, [button]),
-      "follow_gate",
-      `follow_gate:${campaign.campaign_id}:${igsid}`,
+    return (
+      (await this.trySend(
+        () =>
+          this.client.sendButtonTemplate({ igsid }, campaign.copy.follow_gate ?? DEFAULT_FOLLOW_GATE, [button]),
+        "follow_gate",
+        `follow_gate:${campaign.campaign_id}:${igsid}`,
+      )) === "sent"
     );
   }
 
@@ -542,31 +584,52 @@ export class Engine {
    * The trade is deliberate: at-most-once delivery. A genuinely lost message leaves that person
    * where they were instead of being messaged again.
    */
-  private async trySend<T>(fn: () => Promise<T>, label: string, key?: string): Promise<boolean> {
+  private async trySend<T>(
+    fn: () => Promise<T>,
+    label: string,
+    key?: string,
+    /** Identifiers for the log line. Without them a refusal names no comment and no campaign,
+     *  which is how one dead comment retried unnoticed for a day. */
+    ctx?: { comment_id?: string; campaign_id?: string },
+  ): Promise<SendOutcome> {
     const claimKey = key ?? null;
     if (claimKey && !(await claimSend(this.db, claimKey))) {
       console.warn(`[chatmany] skipping ${label}: already attempted, may have delivered (${claimKey})`);
-      return true;
+      return "sent";
     }
     try {
       await this.queue.run(fn);
-      return true;
+      return "sent";
     } catch (e) {
       // An InstagramApiError means we received an HTTP response — the request reached Instagram
       // and was refused, so nothing went out. Anything else (fetch threw, timeout, socket closed)
       // means we never learned the outcome, and the message may already be in the person's inbox.
-      const rejected = e instanceof InstagramApiError;
-      if (rejected) {
+      if (e instanceof InstagramApiError) {
         if (claimKey) await releaseSend(this.db, claimKey);
-        console.warn(`[chatmany] send failed (${label}), will retry: ${msg(e)}`);
-        return false;
+        const retryable = e.isRetryable;
+        console.warn(
+          `[chatmany] send ${retryable ? "failed" : "refused"} (${label})${where(ctx)}: ${msg(e)}` +
+            ` [http ${e.status}${e.code !== undefined ? ` code ${e.code}` : ""}` +
+            `${e.subcode !== undefined ? ` subcode ${e.subcode}` : ""}]` +
+            (retryable ? " — will retry" : " — final, not retrying"),
+        );
+        return retryable ? "retry" : "rejected";
       }
       console.warn(
-        `[chatmany] send outcome unknown (${label}): ${msg(e)} — treating as delivered so it is not sent twice`,
+        `[chatmany] send outcome unknown (${label})${where(ctx)}: ${msg(e)} — treating as delivered so it is not sent twice`,
       );
-      return claimKey ? true : false;
+      return claimKey ? "sent" : "retry";
     }
   }
+}
+
+/** " (comment 123 / campaign x)" for a log line, or "" when the caller gave no identifiers. */
+function where(ctx?: { comment_id?: string; campaign_id?: string }): string {
+  if (!ctx) return "";
+  const parts: string[] = [];
+  if (ctx.comment_id) parts.push(`comment ${ctx.comment_id}`);
+  if (ctx.campaign_id) parts.push(`campaign ${ctx.campaign_id}`);
+  return parts.length ? ` (${parts.join(" / ")})` : "";
 }
 
 function msg(e: unknown): string {

@@ -29,6 +29,21 @@ export class InstagramApiError extends Error {
   get isRateLimit(): boolean {
     return this.status === 429 || (this.code !== undefined && RATE_LIMIT_CODES.has(this.code));
   }
+
+  /**
+   * True when trying the same call again could plausibly succeed.
+   *
+   * The distinction matters because a caller that retries everything retries forever. Instagram
+   * refuses a private reply to a comment past its 7-day window with a plain 4xx, and no amount of
+   * waiting changes that answer — but the comment poll re-reads the same comment every tick, so an
+   * unconditional "retry" meant one dead comment being re-attempted every 60 seconds for as long
+   * as the deployment lived, with nothing recorded and nothing on screen. Retryable is therefore
+   * the narrow set: throttling, a server-side fault, and an auth failure (which a token refresh or
+   * a reconnect can genuinely clear). Everything else is this comment's final answer.
+   */
+  get isRetryable(): boolean {
+    return this.isRateLimit || this.status >= 500 || this.status === 401 || this.code === 190;
+  }
 }
 
 // ---- message payload shapes ----

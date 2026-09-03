@@ -429,16 +429,20 @@ describe("4 · the same person, more than once", () => {
     expect(await sim.state("ida", "c2")).toBeNull();
     sim.note("c1 got its DM. c2's was refused — correct so far, nothing was delivered twice.");
 
-    // A rejection is treated as retryable, so the comment is deliberately left unprocessed.
-    expect(await isCommentProcessed(sim.db, id)).toBe(false);
+    // Instagram will refuse that second private reply forever, so the refusal is FINAL: the comment
+    // is consumed instead of being re-attempted on every poll. This used to be left unprocessed,
+    // which turned one dead comment into a permanent hot loop burning an API call a minute.
+    expect(await isCommentProcessed(sim.db, id)).toBe(true);
 
+    const sendsAfterFirstPoll = sim.client.calls.privateReply.length;
     for (let i = 0; i < 3; i++) await sim.repoll("ida", "send me the LINK and the GUIDE", id);
 
-    sim.note(`After 3 more polls, comment still unprocessed: ${!(await isCommentProcessed(sim.db, id))}`);
-    sim.note("⚠️  This never resolves. Instagram will refuse that second private reply forever, so the");
-    sim.note("   comment is retried on EVERY poll, indefinitely — a permanent hot loop burning API calls.");
-    expect(await isCommentProcessed(sim.db, id)).toBe(false);
+    sim.note("Instagram's refusal is final, so the comment is consumed rather than retried forever.");
+    sim.note(`After 3 more polls, extra private replies attempted: ${sim.client.calls.privateReply.length - sendsAfterFirstPoll}`);
+    expect(sim.client.calls.privateReply.length).toBe(sendsAfterFirstPoll);
     expect(await sim.state("ida", "c2")).toBeNull();
+    sim.note("And the lead that could not be answered is recorded as opening_failed, not dropped.");
+    expect((await eventCountsByType(sim.db, "c2", 0)).opening_failed).toBe(1);
   });
 });
 
