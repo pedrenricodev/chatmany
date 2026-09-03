@@ -32,13 +32,19 @@ export async function pollComments(rt: Runtime, db: D1Database): Promise<void> {
   const mediaIds = [...new Set(campaigns.flatMap((c) => campaignMediaIds(c)))];
   let handled = 0;
   let failed = 0;
+  let unreadable = 0;
   let lastError = "";
   for (const mediaId of mediaIds) {
     let comments;
     try {
       comments = await rt.client.getComments(mediaId);
     } catch (e) {
-      console.warn(`[chatmany] getComments(${mediaId}) failed: ${e instanceof Error ? e.message : e}`);
+      // A media we cannot read is a campaign that silently answers nobody, and until now this was
+      // a console line and nothing else: the dashboard stayed green while an entire post went
+      // unwatched. Counted and surfaced with the poll's other failures.
+      unreadable++;
+      lastError = `getComments(${mediaId}): ${e instanceof Error ? e.message : e}`;
+      console.warn(`[chatmany] ${lastError}`);
       continue;
     }
     for (const c of comments) {
@@ -84,10 +90,13 @@ export async function pollComments(rt: Runtime, db: D1Database): Promise<void> {
   // EVERY comment fails now returns normally, where it used to throw. Without this the dashboard
   // would read healthy while no lead had been answered for hours, which is the exact failure mode
   // the message poll's health signal was added for. Surface it the same way.
-  if (failed > 0) {
+  if (failed > 0 || unreadable > 0) {
+    const parts: string[] = [];
+    if (unreadable > 0) parts.push(`${unreadable}/${mediaIds.length} media unreadable`);
+    if (failed > 0) parts.push(`${failed}/${handled} comment(s) failed`);
     await kvSet(db, ERROR_KEY, JSON.stringify({
       at: now(),
-      message: `${failed}/${handled} comment(s) failed; last: ${lastError}`.slice(0, 300),
+      message: `${parts.join("; ")}; last: ${lastError}`.slice(0, 300),
     }));
   } else if (await kvGet(db, ERROR_KEY)) {
     await kvSet(db, ERROR_KEY, "");

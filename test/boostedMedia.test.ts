@@ -18,6 +18,7 @@ import { InstagramApiError } from "../src/api/client";
 import { campaignMediaIds, validateCampaign, ConfigError } from "../src/config";
 import { pollComments } from "../src/poller/commentPoll";
 import { eventCountsByType, isCommentProcessed, upsertCampaign } from "../src/db";
+import { getCommentPollError } from "../src/poller/commentPoll";
 import type { Campaign, NormalizedComment } from "../src/types";
 import type { Runtime } from "../src/runtime";
 import { makeTestDb } from "./helpers/fakeD1";
@@ -133,6 +134,41 @@ describe("a comment left on the boosted copy", () => {
 
     await pollComments(rt, db);
     expect(fetched).toEqual(["organic1", "shared", "organic2"]);
+  });
+});
+
+describe("a media the account cannot read", () => {
+  it("is reported instead of being swallowed, so a silent post is visible", async () => {
+    const db = await makeTestDb();
+    await upsertCampaign(db, campaign({ ad_media_ids: ["adcopy1"] }));
+
+    const rt = {
+      client: {
+        getComments: async (id: string) => {
+          if (id === "adcopy1") throw new InstagramApiError("(#100) Tried accessing nonexisting field", 400, 100);
+          return [];
+        },
+      },
+      engine: { handleComment: async () => {} },
+    } as unknown as Runtime;
+
+    await pollComments(rt, db);
+
+    const err = await getCommentPollError(db);
+    expect(err?.message).toContain("1/2 media unreadable");
+    expect(err?.message).toContain("adcopy1");
+  });
+
+  it("reports nothing when every media reads fine", async () => {
+    const db = await makeTestDb();
+    await upsertCampaign(db, campaign({ ad_media_ids: ["adcopy1"] }));
+    const rt = {
+      client: { getComments: async () => [] },
+      engine: { handleComment: async () => {} },
+    } as unknown as Runtime;
+
+    await pollComments(rt, db);
+    expect(await getCommentPollError(db)).toBeNull();
   });
 });
 
