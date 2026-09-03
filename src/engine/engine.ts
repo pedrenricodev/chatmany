@@ -173,6 +173,18 @@ export class Engine {
     // A campaign watches its organic post AND any boosted copy of it. Matching on `media_id` alone
     // meant every person the ad brought in was invisible: their comment lives on the copy.
     const campaigns = all.filter((c) => campaignMediaIds(c).includes(evt.media_id));
+
+    // Nothing watches this media. Only the webhook can deliver such a comment — the poll fetches
+    // campaign media and nothing else — and it is deliberately NOT marked processed, so attaching
+    // that media to a campaign later can still reach the people who already commented.
+    //
+    // Marking it consumed the boosted copies' commenters on 2026-09-03: the webhook pushed each
+    // comment the moment it was left, the media belonged to no campaign yet, and every one was
+    // written off as "no keyword matched". Pointing the campaign at the copy afterwards changed
+    // nothing, because the first line of this method had already claimed them. Re-handling one of
+    // these is free: no send happens, and the ledgers make a repeat delivery impossible anyway.
+    if (campaigns.length === 0) return;
+
     let matchedCampaignId = "-";
     // A retryable opening-send failure leaves the comment unprocessed so the next poll retries it.
     let pendingRetry = false;

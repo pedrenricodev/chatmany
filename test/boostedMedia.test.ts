@@ -107,6 +107,27 @@ describe("a comment left on the boosted copy", () => {
     expect(client.calls.privateReply).toHaveLength(0);
   });
 
+  it("does not consume a comment on media no campaign watches yet", async () => {
+    const { db, engine } = await harness();
+    const evt = comment({ media_id: "adcopy1" });
+
+    // The webhook pushes the comment the moment it is left — before anyone has told the campaign
+    // about the boosted copy.
+    await engine.handleComment(evt, [campaign()]);
+    expect(await isCommentProcessed(db, evt.comment_id)).toBe(false);
+  });
+
+  it("answers that person once the copy is attached to the campaign", async () => {
+    const { db, client, engine } = await harness();
+    const evt = comment({ media_id: "adcopy1" });
+
+    await engine.handleComment(evt, [campaign()]);            // webhook, media unknown
+    await engine.handleComment(evt, [campaign({ ad_media_ids: ["adcopy1"] })]); // id pasted in
+
+    expect(client.calls.privateReply).toHaveLength(1);
+    expect(await isCommentProcessed(db, evt.comment_id)).toBe(true);
+  });
+
   it("is fetched by the poller alongside the organic post", async () => {
     const db = await makeTestDb();
     await upsertCampaign(db, campaign({ ad_media_ids: ["adcopy1", "adcopy2"] }));
