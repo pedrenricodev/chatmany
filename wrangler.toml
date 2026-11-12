@@ -86,3 +86,6 @@ WEBHOOK_RECONCILE_SECONDS = "900"
 # Redirect URI registered in your Meta app. Must match exactly: https://<your-worker>/auth/callback
 # You MUST change this before deploying — the placeholder is not a working URL.
 REDIRECT_URI = "https://chatmany.pedro-9e8.workers.dev/auth/callback"
+# Este worker é o callback de webhook do app na Meta (só cabe um). Repassa tudo pro chatmany do @ianasfinancas,
+# que usa o mesmo app; cada worker ignora o que é da outra conta.
+WEBHOOK_FORWARD_URLS = "https://chatmany-iafin.pedro-9e8.workers.dev/webhook"

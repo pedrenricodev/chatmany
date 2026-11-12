@@ -2,13 +2,18 @@
 # Troca a senha do painel (secret OWNER_TOKEN) sem ela aparecer na tela,
 # no histórico do shell, nem em nenhum log. Atualiza o SEGREDOS.txt junto.
 #
-#   ./trocar-senha.sh
+#   ./trocar-senha.sh         painel do @pedroenrico.ia
+#   ./trocar-senha.sh iafin   painel do @ianasfinancas
 #
 set -euo pipefail
 cd "$(dirname "$0")"
 
 MIN=14
-ARQ="SEGREDOS.txt"
+if [ "${1:-}" = "iafin" ]; then
+  CFG=(-c wrangler.iafin.toml); ARQ="SEGREDOS-iafin.txt"; URL="https://chatmany-iafin.pedro-9e8.workers.dev"
+else
+  CFG=(); ARQ="SEGREDOS.txt"; URL="https://chatmany.pedro-9e8.workers.dev"
+fi
 
 echo "Nova senha do painel."
 echo "Mínimo $MIN caracteres. Use uma FRASE, não uma palavra: o painel"
@@ -27,14 +32,14 @@ if [ "${#S1}" -lt "$MIN" ]; then
 fi
 
 echo "Gravando no Cloudflare..."
-printf '%s' "$S1" | npx wrangler secret put OWNER_TOKEN >/dev/null 2>&1
+printf '%s' "$S1" | npx wrangler secret put OWNER_TOKEN "${CFG[@]+"${CFG[@]}"}" >/dev/null 2>&1
 
 # Confere de verdade contra a API antes de dizer que deu certo.
 echo "Esperando propagar..."
 sleep 6
 CODE=$(curl -s -o /dev/null -w '%{http_code}' \
   -H "Authorization: Bearer $S1" \
-  https://chatmany.pedro-9e8.workers.dev/api/status)
+  "$URL/api/status")
 
 if [ "$CODE" != "200" ]; then
   echo
@@ -60,4 +65,4 @@ unset S1 S2
 echo
 echo "Pronto. Senha trocada e testada contra a API: HTTP 200."
 echo "O token antigo de 64 caracteres não vale mais."
-echo "Painel: https://chatmany.pedro-9e8.workers.dev"
+echo "Painel: $URL"

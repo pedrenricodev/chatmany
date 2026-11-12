@@ -22,6 +22,8 @@ export interface Env {
   APP_SECRET: string;
   OWNER_TOKEN: string;
   WEBHOOK_VERIFY_TOKEN?: string;
+  /** Outros workers do mesmo app Meta que recebem cópia dos webhooks (vírgula). Só no worker que é o callback. */
+  WEBHOOK_FORWARD_URLS?: string;
 }
 
 /** Funnel state for one person in one campaign. */

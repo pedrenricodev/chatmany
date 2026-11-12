@@ -100,6 +100,11 @@ export async function handleWebhookEvent(env: Env, req: Request): Promise<Respon
     return new Response("invalid signature", { status: 401 });
   }
 
+  // A Meta aceita um único callback por app. Quando o mesmo app atende outra instalação (outra conta
+  // do Instagram, outro worker), esta repassa o evento cru com a assinatura original; a outra valida
+  // com o mesmo APP_SECRET. Cada worker ignora o que não é dele (igsid e mídia são por conta).
+  await forwardWebhook(env, raw, sig!);
+
   let body: WebhookBody;
   try {
     body = JSON.parse(raw) as WebhookBody;
@@ -178,6 +183,22 @@ export async function handleWebhookEvent(env: Env, req: Request): Promise<Respon
   }
 
   return failed > 0 ? json({ ok: true, failed }) : json({ ok: true });
+}
+
+async function forwardWebhook(env: Env, raw: string, sig: string): Promise<void> {
+  const urls = (env.WEBHOOK_FORWARD_URLS ?? "").split(",").map((u) => u.trim()).filter(Boolean);
+  await Promise.allSettled(
+    urls.map((u) =>
+      fetch(u, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-hub-signature-256": sig },
+        body: raw,
+        signal: AbortSignal.timeout(5000),
+      }).then((r) => {
+        if (!r.ok) console.warn(`[chatmany] forward to ${u} answered ${r.status}`);
+      }),
+    ),
+  );
 }
 
 async function verifySignature(appSecret: string, raw: string, header: string | null): Promise<boolean> {

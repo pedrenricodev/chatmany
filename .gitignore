@@ -27,3 +27,7 @@ wrangler.qa.toml
 
 # segredos locais, nunca commitar
 SEGREDOS.txt
+
+# instalação do @ianasfinancas: id real do banco e segredos
+wrangler.iafin.toml
+SEGREDOS-*.txt
